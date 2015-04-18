@@ -4,12 +4,7 @@ title: About
 permalink: /about/
 ---
 
-Some information about you!
+I write code from sunny Austin, TX for [Zenoss](http://zenoss.org),
+[GotMyJobs](http://gotmyjobs.com) and many other projects.
 
-### More Information
-
-A place to include any other types of information that you'd like to include about yourself.
-
-### Contact me
-
-[email@domain.com](mailto:email@domain.com)
+[ian.mccracken@gmail.com](mailto:ian.mccracken@gmail.com)

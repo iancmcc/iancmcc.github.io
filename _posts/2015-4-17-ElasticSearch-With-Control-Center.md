@@ -1,27 +1,61 @@
 ---
 layout: post
-title: Easy ElasticSearch with Control Center
+title: Deploying Applications with Control Center
 ---
-Intro.
+[Control Center](http://controlcenter.io) is an open source tool for deploying
+and managing complex applications across any number of hosts. We use it at
+[Zenoss](http://www.zenoss.org) to allow easy scale out of Zenoss services
+(like HBase, RabbitMQ, and Zenoss itself) with almost no configuration.  If
+you've got an application with a bunch of moving parts, you can describe that
+service in a Control Center service template, then provide that template to the
+world.  Anybody can then deploy that same template into their own Control
+Center to run your application.  This tutorial will go over the basics of how
+to define your own application in Control Center.
 
-As an example, here’s how you might deploy an elasticsearch cluster with
-Control Center. The source for this example is [available on
-GitHub](https://github.com/iancmcc/elasticsearch-ctrlctr). You may also find [Control Center's
-service definition documentation](http://controlcenter.io/docs/index.html)
-useful. 
+Part 1 of this tutorial will go over a simplistic case, running a single
+instance of [Elasticsearch](https://www.elastic.co). Part 2 will turn that same
+service into an easily expandable cluster.
+
+The source for this example is [available on
+GitHub](https://github.com/iancmcc/elasticsearch-ctrlctr). You may also find
+[Control Center's service definition
+documentation](http://controlcenter.io/docs/index.html) useful. 
 
 This assumes you've [installed Control Center
 1.0.x](http://controlcenter.io/gettingstarted.html), which will also install
 [Docker](https://www.docker.com).
 
+## Overview
+Control Center provides an application with a distributed filesystem,
+centralized configuration and logging, and internal networking. You build
+a Docker image containing the software, wire the components of your application
+up in a JSON service definition, and turn it loose.
+
+We'll go through all the steps:
+
+ * Building the Docker image
+ * Describing config files
+ * Describing networking
+ * Defining persistent storage
+
 ## Building the image
-To run a service in Control Center, you need a Docker image for the application you want to run. There’s nothing unique to Control Center in this; [an existing Docker image will probably work](https://registry.hub.docker.com/). For the purposes of this example, here’s a very simple Dockerfile that defines an image with elasticsearch 1.4.2 installed to /usr/local/elasticsearch:
+
+_Note: Instead of building your own image, you can use [one I've already
+built](https://registry.hub.docker.com/u/iancmcc/elasticsearch://registry.hub.docker.com/u/iancmcc/elasticsearch/).
+Just replace all references to ``elasticsearch-example`` with
+``iancmcc/elasticsearch``._
+
+To run a service in Control Center, you need a Docker image for the application
+you want to run. There’s nothing unique to Control Center in this image; [an
+existing Docker image will probably work](https://registry.hub.docker.com/).
+For the purposes of this example, here’s a very simple Dockerfile that defines
+an image with Elasticsearch 1.4.2 installed:
 
 ```docker
 # Use semiofficial image with Java installed 
 # (https://github.com/dockerfile/java)
 FROM dockerfile/java:oracle-java7
-# Download and unpack elasticsearch into /usr/local
+# Download and unpack Elasticsearch into /usr/local
 RUN curl -s https://download.elasticsearch.org/elasticsearch/elasticsearch/elasticsearch-1.4.2.tar.gz | tar -C /usr/local -xz
 RUN ln -s /usr/local/elasticsearch-1.4.2 /usr/local/elasticsearch
 # Make a directory to hold data (more about this later)
@@ -74,7 +108,7 @@ First, we describe a few simple things about our service in ``service.json``:
 ```json
 {
      "Title": "elasticsearch-cluster",
-     "Name": "ElasticSearch",
+     "Name": "Elasticsearch",
      "Version": "1.4.2",
      "Launch": "auto",
      "Command": "/usr/local/elasticsearch/bin/elasticsearch",
@@ -82,22 +116,31 @@ First, we describe a few simple things about our service in ``service.json``:
 }
 ```
 
-Technically, that’s enough to run the thing, but it won’t be super useful yet, since you have a) no way to access the elasticsearch server, and b) no way to configure it.
+Notice I called it "elasticsearch-cluster"; admittedly, this is jumping the
+gun for this part of the tutorial. Bear with me until Part 2 for the payoff.
+
+So, technically, what you've defined is enough to run the thing, but it won’t
+be super useful yet, since you have a) no way to access the Elasticsearch
+server, and b) no way to configure it.
 
 ### Config Files
 Control Center manages the config files for your service. You edit them in the
 Control Center UI and restart your service to see the changes. Control Center
 will inject them into the container on startup wherever in the filesystem you
-tell it to. This helps two things: you don’t have to rebuild or retag your
+tell it to. 
+
+This helps two things: you don’t have to rebuild or retag your
 service image every time you want to tweak a config file, and services can
 start up on any host in the cluster without worrying about that host’s state.
+
 Also, config files injected via Control Center can take advantage of templating
 to set values based on the service definition or the state of the system.
 
-For our elasticsearch service, we should provide the two elasticsearch config
-files, ``elasticsearch.yml`` and ``logging.yml``. Let’s pull the defaults out
-of the elasticsearch distribution in the image we just built and include them
-in our service template:
+For our Elasticsearch service, we should at least expose the two Elasticsearch
+config files, ``elasticsearch.yml`` and ``logging.yml``. Let’s pull the
+defaults out of the Elasticsearch distribution in the image we just built and
+include them in our service template. We'll make a temporary container, copy
+the files out, and remove the container:
 
 ```bash
 # Create the directory
@@ -133,14 +176,16 @@ to ``service.json``:
      }
 }
 ```
-When the template is compiled, those files will be pulled in and set as the defaults.
+When the template is compiled, those files will be pulled in and set as the
+defaults, and when the service is deployed, they'll be editable in the UI.
 
 ### Networking
-Next, we need to expose some ports from inside the container, so we can access
-the elasticsearch REST API. This is similarly straightforward. Since we’re not
-worried about clustering at this stage, let’s just expose the default HTTP port
-(9200). Let’s also add a default virtual host we can use to access the service
-through the HTTPS interface Control Center provides. Add to ``service.json``:
+In Part 1, we don't have any internal networking to configure, since we're not
+defining a cluster, but we still want some ports exposed, so we can access
+the Elasticsearch REST API. This is pretty simple.  We'll just expose the
+default HTTP port (9200). Let’s also add a default virtual host we can use to
+access the service through the HTTPS interface Control Center provides. Add to
+``service.json``:
 
 ```json
 {
@@ -191,3 +236,50 @@ path:
      data: /var/data/elasticsearch
 ```
 
+## Compiling the template
+
+Now all we need is to deploy this thing. Compiling the template simply combines
+all the parts into a single JSON file, which, in this example, really just
+means bringing the config files in. You use the same binary (``serviced``) to
+compile the template as you do to run Control Center. 
+
+```bash
+# This is the directory with service.json in it
+$ serviced compile /path/to/elasticsearch > /tmp/elasticsearch.json
+```
+
+## Deploying the template
+
+You can do this from the Control Center UI just as easily,
+but for ease we'll do it from the command line. First, add the template you
+just created to Control Center, and save off the ID it will output:
+
+```bash
+$ ELASTICTPL=$(serviced template add /tmp/elasticsearch.json)
+```
+
+Then deploy an instance of it to your default pool, named "Elasticsearch":
+
+```bash
+$ serviced template deploy $ELASTICTPL default Elasticsearch
+```
+
+Now you can start it up:
+
+```bash
+$ serviced service start Elasticsearch 
+```
+
+## Accessing the virtual host
+In order to use the virtual host, you'll need to access it by hostname. Add to
+/etc/hosts:
+
+```bash
+$ sudo bash -c 'echo 127.0.0.1 elasticsearch.localhost >> /etc/hosts'
+```
+
+Then you should be able to access the API:
+
+```bash
+$ curl -k https://elasticsearch.localhost
+```

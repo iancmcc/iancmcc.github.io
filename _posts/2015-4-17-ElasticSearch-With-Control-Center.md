@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Deploying Applications with Control Center, Part 1
+title: Delivering Applications in Control Center, Part 1
 ---
 [Control Center](http://controlcenter.io) is an open source tool for deploying
 and managing complex applications across any number of hosts. We use it at
@@ -37,6 +37,7 @@ We'll go through all the steps:
  * Describing config files
  * Describing networking
  * Defining persistent storage
+ * Defining health checks
 
 ## Building the image
 

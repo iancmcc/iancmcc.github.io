@@ -305,5 +305,5 @@ sudo bash -c 'echo 10.1.2.3 elasticsearch.cchost cchost >> /etc/hosts'
 Then you should be able to access the API:
 
 ```bash
-curl -k https://elasticsearch.localhost
+curl -k https://elasticsearch.cchost
 ```

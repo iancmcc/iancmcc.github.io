@@ -148,7 +148,7 @@ $ export ESDIR=/usr/local/elasticsearch/config
 $ export CFGDIR=elasticsearch/-CONFIGS-$ESDIR
 $ mkdir -p $CFGDIR
 # Create a container based on your image, to get the files out
-$ docker run -n es-configs elasticsearch-example echo
+$ docker run --name es-configs elasticsearch-example echo
 # Copy the files from that container
 $ docker cp es-configs:$ESDIR/elasticsearch.yml $CFGDIR
 $ docker cp es-configs:$ESDIR/logging.yml $CFGDIR

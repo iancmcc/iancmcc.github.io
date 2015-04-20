@@ -244,8 +244,7 @@ means bringing the config files in. You use the same binary (``serviced``) to
 compile the template as you do to run Control Center. 
 
 ```bash
-# This is the directory with service.json in it
-$ serviced compile /path/to/elasticsearch > /tmp/elasticsearch.json
+$ serviced template compile elasticsearch > /tmp/elasticsearch.json
 ```
 
 ## Deploying the template

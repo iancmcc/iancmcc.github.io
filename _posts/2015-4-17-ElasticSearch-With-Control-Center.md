@@ -60,24 +60,28 @@ RUN curl -s https://download.elasticsearch.org/elasticsearch/elasticsearch/elast
 RUN ln -s /usr/local/elasticsearch-1.4.2 /usr/local/elasticsearch
 # Make a directory to hold data (more about this later)
 RUN mkdir -p /var/data/elasticsearch
+# Install jq to make health checks easier to write
+RUN apt-get update && \
+    apt-get install jq && \
+    rm -rf /var/lib/apt/lists/*
 ```
 
 Stick that Dockerfile in an empty directory, cd to it, and run:
 
 ```bash
-$ docker build -t elasticsearch-example .
+docker build -t elasticsearch-example .
 ```
 
 Make sure it's there:
 
 ```bash
-$ docker images | grep elasticsearch-example
+docker images | grep elasticsearch-example
 ```
 
 You can try running it quick to make sure it works:
 
 ```bash
-$ docker run --rm -it elasticsearch-example \
+docker run --rm -it elasticsearch-example \
     /usr/local/elasticsearch/bin/elasticsearch
 ```
 
@@ -96,10 +100,10 @@ uneditable. So let’s make the template directory, the config file directory,
 and the base service template:
 
 ```bash
-$ mkdir elasticsearch
+mkdir elasticsearch
 # -CONFIGS- is a convention the template compiler looks for
-$ mkdir elasticsearch/-CONFIGS- 
-$ touch elasticsearch/service.json
+mkdir elasticsearch/-CONFIGS- 
+touch elasticsearch/service.json
 ```
 
 ### Service Metadata
@@ -147,16 +151,16 @@ the files out, and remove the container:
 
 ```bash
 # Create the directory
-$ export ESDIR=/usr/local/elasticsearch/config
-$ export CFGDIR=elasticsearch/-CONFIGS-$ESDIR
-$ mkdir -p $CFGDIR
+export ESDIR=/usr/local/elasticsearch/config
+export CFGDIR=elasticsearch/-CONFIGS-$ESDIR
+mkdir -p $CFGDIR
 # Create a container based on your image, to get the files out
-$ docker run --name es-configs elasticsearch-example echo
+docker run --name es-configs elasticsearch-example echo
 # Copy the files from that container
-$ docker cp es-configs:$ESDIR/elasticsearch.yml $CFGDIR
-$ docker cp es-configs:$ESDIR/logging.yml $CFGDIR
+docker cp es-configs:$ESDIR/elasticsearch.yml $CFGDIR
+docker cp es-configs:$ESDIR/logging.yml $CFGDIR
 # Clean up the container
-$ docker rm es-configs
+docker rm es-configs
 ```
 
 Now let’s tell our service template where they are and where to put them. Add
@@ -239,6 +243,23 @@ path:
      data: /var/data/elasticsearch
 ```
 
+### Health Checks
+
+It's good practice to add health checks for your service. Control Center will run these in each container and report the results back. We'll add a quick one to ``service.json`` that simply checks the Elasticsearch cluster status:
+
+```json
+{
+     ...
+     "HealthChecks": {
+        "cluster": {
+            "Script": "curl -s 'http://localhost:9200/_cluster/health?pretty=true' | jq '.status' | grep -q green",
+            "Interval": 10.0
+        }
+    }
+}
+```
+This uses [jq](http://stedolan.github.io/jq/) to parse the JSON returned by Elasticsearch.
+
 ## Compiling the template
 
 Now all we need is to deploy this thing. Compiling the template simply combines
@@ -247,7 +268,7 @@ means bringing the config files in. You use the same binary (``serviced``) to
 compile the template as you do to run Control Center. 
 
 ```bash
-$ serviced template compile elasticsearch > /tmp/elasticsearch.json
+serviced template compile elasticsearch > /tmp/elasticsearch.json
 ```
 
 ## Deploying the template
@@ -257,31 +278,31 @@ but for ease we'll do it from the command line. First, add the template you
 just created to Control Center, and save off the ID it will output:
 
 ```bash
-$ ELASTICTPL=$(serviced template add /tmp/elasticsearch.json)
+ELASTICTPL=$(serviced template add /tmp/elasticsearch.json)
 ```
 
 Then deploy an instance of it to your default pool, named "Elasticsearch":
 
 ```bash
-$ serviced template deploy $ELASTICTPL default Elasticsearch
+serviced template deploy $ELASTICTPL default Elasticsearch
 ```
 
 Now you can start it up:
 
 ```bash
-$ serviced service start Elasticsearch 
+serviced service start Elasticsearch 
 ```
 
 ## Accessing the virtual host
-In order to use the virtual host, you'll need to access it by hostname. Add to
-/etc/hosts:
+In order to use the virtual host, you'll need to access it by hostname. Add an entry to /etc/hosts to add ``elasticsearch.HOSTNAME`` to the entry for ``HOSTNAME``. For example (specific values obviously won't work 
+for you):
 
 ```bash
-$ sudo bash -c 'echo 127.0.0.1 elasticsearch.localhost >> /etc/hosts'
+sudo bash -c 'echo 10.1.2.3 elasticsearch.cchost cchost >> /etc/hosts'
 ```
 
 Then you should be able to access the API:
 
 ```bash
-$ curl -k https://elasticsearch.localhost
+curl -k https://elasticsearch.localhost
 ```

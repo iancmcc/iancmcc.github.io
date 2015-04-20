@@ -112,7 +112,10 @@ First, we describe a few simple things about our service in ``service.json``:
      "Version": "1.4.2",
      "Launch": "auto",
      "Command": "/usr/local/elasticsearch/bin/elasticsearch",
-     "ImageID": "elasticsearch-example"
+     "ImageID": "elasticsearch-example",
+     "Instances": {
+        "Default": 1
+     }
 }
 ```
 
@@ -157,7 +160,7 @@ $ docker rm es-configs
 ```
 
 Now let’s tell our service template where they are and where to put them. Add
-to ``service.json``:
+to ``service.json`` (don't forget appropriate commas):
 
 ```json
 {
